@@ -8,6 +8,10 @@ const userModel = require('../models/user');
 const varificationModel = require('../models/userVarification');
 const fetchUser = require('../middleware/fetchuser');
 
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const client = require('twilio')(accountSid, authToken);
+
 
 
 // API 1: Registration API
@@ -17,7 +21,7 @@ router.post('/signin', [
     body('lname', "Enter your last name").trim().isLength({ min: 3 }),
     body('email', "Enter your email").trim().isEmail(),
     body('password', "Enter password").trim().isLength({ min: 8 }),
-    body('countryCode', "Enter country code").trim().isLength({ max: 3 }),
+    body('countryCode', "Enter country code").trim().isLength({min:1, max: 3 }),
     body('phone', "Enter phone number").trim().isMobilePhone(),
     body('country', "Enter your country").trim().notEmpty()
 ], async (req, res) => {
@@ -70,6 +74,8 @@ router.post('/signin', [
             return OTP;
         }
 
+        const createOtp = generateOTP(6);
+
         // Function to shuffle the characters in the OTP string
         function shuffleString(str) {
             const arr = str.split('');
@@ -87,10 +93,24 @@ router.post('/signin', [
             country,
             countryCode,
             phone,
-            otp: generateOTP(6)
+            otp: createOtp,
         });
 
-        return res.status(200).json({ id: varifyData._id });
+        // Sent otp on the number
+
+        client.messages.create({
+            body: `Your otp is ${createOtp} for register ecommerce website`,
+            from: '+14154948520',
+            to: `+${countryCode}${phone}`
+        });
+
+        // client.messages.create({
+        //     body: `Your otp is ${createOtp} for create ecommerce website`,
+        //     from: '+14154948520',
+        //     to: `+${countryCode}${phone}`
+        // }).then(message => console.log(message.sid));
+
+        return res.status(200).json({ id: varifyData._id, message: 'OTP send successfully' });
 
     } catch (error) {
         return res.status(500).json({ error: error });

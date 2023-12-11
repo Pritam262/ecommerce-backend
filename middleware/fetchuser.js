@@ -4,7 +4,7 @@ const userModel = require('../models/user');
 const jwtKey = process.env.JWT_SECRETE_KEY;
 
 const fetchuser = async (req, res, next) => {
-    const token = req.header('auth-toke');
+    const token = req.header('auth-token');
     if (!token) {
         return res.status(401).json({ error: "Token not found" })
     }
