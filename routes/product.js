@@ -119,7 +119,7 @@ router.post('/upload', sellerFetchuser, upload.fields([{ name: 'images', maxCoun
         console.log(product);
         return res.status(200).json({ success: 'Product uploadsuccessfully' });
     } catch (error) {
-    return res.status(500).json({ error});
+        return res.status(500).json({ error });
     }
 });
 
@@ -157,14 +157,79 @@ router.post('/upload', sellerFetchuser, upload.fields([{ name: 'images', maxCoun
 */
 
 
-// API : Fetch all product
+// API 2: Fetch all product
 
 router.get('/allproduct', async (req, res) => {
     try {
-        const product = await productModel.find().populate('seller', 'sellername');
-        return res.status(200).json(product)
+        const page = req.query.page || 1; // Get the requested page number from the query
+        const perPage = 20; // Number of item per page
+        const allProduct = await productModel.find().skip((page-1)*perPage).limit(perPage).populate('seller', 'sellername');
+        const product = allProduct.map((item, index) => {
+            return (
+                {
+                    id: item._id,
+                    productType: item.productType,
+                    imagePath:`http://127.0.0.1:3000/${item.images[0].path}`,
+                    title: item.title,
+                    description: item.description,
+                    qty:(item.qty<15)?item.qty:'',
+                    price: item.price,
+                    color:item.color,
+                    seller: {
+                        sellerId: item.seller._id,
+                        sellerName: item.seller.sellername,
+                    }
+                }
+            )
+        })
+        return res.status(200).json({totalLength:allProduct.length, page:page, perPage, product})
     } catch (error) {
         return res.status(500).json({ error })
+    }
+})
+
+// API 3: Fetch specific product
+
+router.get('/getproduct', async (req, res) => {
+    const videoId = req.query.videoId;
+
+    if (!videoId) {
+        return res.status(400).json({ error: 'Product not found' })
+    }
+    try {
+        const product = await productModel.findOne({ _id: videoId }).populate('seller', 'sellername');
+
+        return res.status(200).json({ product });
+    } catch (error) {
+        return res.status(500).json({ error })
+    }
+})
+
+// API 4: Delete product
+
+router.delete('/deleteproduct', sellerFetchuser, async (req, res) => {
+
+    const id = req.user.id;
+    const videoId = req.header.id;
+    try {
+        if (!videoId) {
+            return res.status(400).json({ error: 'Video id not found' })
+        }
+        let product = await productModel.findById(videoId);
+        if (!product) { return res.status(404).send('File not found') };
+        if (product.seller._id.toString() = req.user.id) {
+            return res.status(401).json({ error: "User not allowed" });
+        }
+        product.images.map((item, index) => {
+            fs.unlinkSync(`./${item.path}`)
+        });
+        const deleteProduct = await productModel.findByIdAndDelete(videoId);
+        if (deleteProduct) {
+            return res.status(200).json({ success: "Product delete successfully" })
+        }
+
+    } catch (error) {
+        return res.status(500).json({ error });
     }
 })
 
