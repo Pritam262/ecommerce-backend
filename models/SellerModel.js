@@ -4,6 +4,7 @@ const userSchema = mongoose.Schema({
     sellername: {
         type: String,
         required: true,
+        unique:true,
     },
     email: {
         type: String,
