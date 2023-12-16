@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const sellerFetchuser = require('../middleware/sellerFecthuser');
+const fetchUser = require('../middleware/fetchuser');
 const path = require('path');
 const multer = require('multer');
 const bp = require('body-parser');
@@ -17,6 +18,8 @@ router.use(bp.json({ limit: '50mb' }));
 router.use(bp.urlencoded({ extended: true, limit: '50mb' }));
 
 const productModel = require('../models/productModel');
+const cartProductModel = require('../models/cartProductModel');
+const { error } = require('console');
 
 
 
@@ -163,18 +166,19 @@ router.get('/allproduct', async (req, res) => {
     try {
         const page = req.query.page || 1; // Get the requested page number from the query
         const perPage = 20; // Number of item per page
-        const allProduct = await productModel.find().skip((page-1)*perPage).limit(perPage).populate('seller', 'sellername');
+        const allProduct = await productModel.find().skip((page - 1) * perPage).limit(perPage).populate('seller', 'sellername');
         const product = allProduct.map((item, index) => {
             return (
                 {
                     id: item._id,
                     productType: item.productType,
-                    imagePath:`http://127.0.0.1:3000/${item.images[0].path}`,
+                    imagePath: `http://127.0.0.1:3000/${item.images[0].path}`,
                     title: item.title,
                     description: item.description,
-                    qty:(item.qty<15)?item.qty:'',
+                    // qty: (item.qty < 15) ? item.qty : '',
+                    qty:item.qty,
                     price: item.price,
-                    color:item.color,
+                    color: item.color,
                     seller: {
                         sellerId: item.seller._id,
                         sellerName: item.seller.sellername,
@@ -182,7 +186,7 @@ router.get('/allproduct', async (req, res) => {
                 }
             )
         })
-        return res.status(200).json({totalLength:allProduct.length, page:page, perPage, product})
+        return res.status(200).json({ totalLength: allProduct.length, page: page, perPage, product })
     } catch (error) {
         return res.status(500).json({ error })
     }
@@ -233,4 +237,107 @@ router.delete('/deleteproduct', sellerFetchuser, async (req, res) => {
     }
 })
 
+
+// API 5: Cart product
+
+router.post('/cart', fetchUser, async (req, res) => {
+    const productId = req.query.proId;
+
+    const qty = req.body.qty || 1;
+    // const qty  = req.query.qty || 1;
+    if (qty > 11) {
+        return res.status(500).json({ error: 'Maximum order quentity riched' });
+    }
+    if (!productId) {
+        return res.status(400).json({ error: 'Product id not found' })
+    }
+    try {
+
+        const product = await productModel.findById(productId);
+
+        const cartProduct = await cartProductModel.findOne({ product: productId });
+        if (cartProduct) {
+
+            // Update the document in Mongodb
+
+            const user = req.user.id;
+            const product = cartProduct.product;
+            const upQty = cartProduct.qty + qty;
+
+            cartProduct.user = user;
+            cartProduct.product = product;
+            cartProduct.qty = upQty;
+
+            await cartProduct.save();
+
+
+            return res.status(200).json({ success: "Cart update successfully" });
+        } else {
+            const response = await cartProductModel.create({
+                user: req.user.id,
+                product: product._id,
+                qty: qty,
+            });
+
+            return res.status(200).json({ success: response });
+        }
+
+        // return res.status(200).send({ qty: qty })
+    } catch (error) {
+        return res.status(500).json({ error: error.message })
+    }
+})
+
+
+// API 6: See all cart product,
+
+router.get('/cartproduct', fetchUser, async (req, res) => {
+    try {
+        const products = await cartProductModel.find({ user: req.user.id }).populate('product', 'title images price');
+
+        let totalPrice = 0;
+        const allCartproducts = products.map((item, index) => {
+            totalPrice = (totalPrice + (item.qty * item.product.price));
+            return ({
+                id: item._id,
+                user: item.user,
+                productId: item.product._id,
+                title: item.product.title,
+                imageUrl: `http://127.0.0.1:3000/${item.product.images[0].path}`,
+                qty: item.qty,
+                price: item.product.price,
+                proTotalPrice: (item.qty * item.product.price),
+            }
+            )
+        })
+
+        return res.status(200).json({ products: allCartproducts, totalPrice });
+    } catch (error) {
+        return res.status(500).json({ error: error.message })
+    }
+})
+
+// API 7: Delete cart product
+
+router.delete('/deletecart', fetchUser, async (req, res) => {
+
+    const cartId = req.query.cartId;
+    if (!cartId) {
+        return res.status(400).json({ error: "Cart id not found" });
+    }
+    try {
+
+        const cart = await cartProductModel.findById(cartId);
+        if (!cart) {
+            return res.status(400).json({ error: "Cart product not found" });
+        }
+        if (cart.user != req.user.id) {
+            return res.status(400).json({ error: "User isn't allow" });
+        }
+        await cartProductModel.findByIdAndDelete(cartId);
+        return res.status(200).json({ error: 'Product delete successfully' });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+})
 module.exports = router;
