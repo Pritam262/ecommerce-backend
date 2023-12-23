@@ -170,7 +170,7 @@ router.post('/verifymobile', [
 
 
 
-// API 2: Login API
+// API 3: Login API
 
 router.post('/login', [
     body('email', "Enter your email").trim().isEmail(),
@@ -206,5 +206,17 @@ router.post('/login', [
     }
 })
 
+// API 4: Get user data
+
+router.get('/profile',fetchUser, async (req,res)=>{
+    try {
+        const id = req.user.id;
+
+        const profile = await userModel.findOne({_id:id}).select('-password');
+        return res.status(200).json({data:profile});
+    } catch (error) {
+        return res.status(500).json({error:error.message})
+    }
+})
 
 module.exports = router;
