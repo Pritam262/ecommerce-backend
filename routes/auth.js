@@ -21,7 +21,7 @@ router.post('/signin', [
     body('lname', "Enter your last name").trim().isLength({ min: 3 }),
     body('email', "Enter your email").trim().isEmail(),
     body('password', "Enter password").trim().isLength({ min: 8 }),
-    body('countryCode', "Enter country code").trim().isLength({min:1, max: 3 }),
+    body('countryCode', "Enter country code").trim().isLength({ min: 1, max: 3 }),
     body('phone', "Enter phone number").trim().isMobilePhone(),
     body('country', "Enter your country").trim().notEmpty()
 ], async (req, res) => {
@@ -208,14 +208,44 @@ router.post('/login', [
 
 // API 4: Get user data
 
-router.get('/profile',fetchUser, async (req,res)=>{
+router.get('/profile', fetchUser, async (req, res) => {
     try {
         const id = req.user.id;
 
-        const profile = await userModel.findOne({_id:id}).select('-password');
-        return res.status(200).json({data:profile});
+        const profile = await userModel.findOne({ _id: id }).select('-password');
+        return res.status(200).json({ data: profile });
     } catch (error) {
-        return res.status(500).json({error:error.message})
+        return res.status(500).json({ error: error.message })
+    }
+})
+
+// API 5: Add address
+
+router.post('/addadress', fetchUser, [
+    body('addressline', "Enter your address").trim().isLength({ min: 5 }),
+    body('phone', "Enter your phone number").trim().isMobilePhone(),
+    body('pinCode', "Enter your pin code").trim().isLength({ min: 6 }),
+    body('district', "Enter your district").trim().isLength({ min: 5 }),
+    body('stateName', "Enter your state").trim().isLength({ min: 3 })
+], async (req, res) => {
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array() })
+    }
+    try {
+        const id = req.user.id;
+        const { addressline, phone, pinCode, district, stateName } = req.body;
+        let user = await userModel.findOne({ _id: id }).select('-password');
+
+        const addressData = {
+            addressline, phone, pinCode, district, stateName
+        }
+        user.address.push(addressData);
+        let updateData = user.save()
+        return res.status(200).json({ user: "Address upload successfully" });
+    } catch (error) {
+        return res.status(500).json({ error: error.message })
     }
 })
 
