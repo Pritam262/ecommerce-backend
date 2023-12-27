@@ -4,7 +4,7 @@ const SellerModel = require('../models/SellerModel');
 const jwtKey = process.env.JWT_SECRETE_KEY;
 
 const sellerFetchuser = async (req, res, next) => {
-    const token = req.header('auth-token');
+    const token = req.header('seller-token');
     if (!token) {
         return res.status(401).json({ error: "Token not found" })
     }
@@ -12,7 +12,6 @@ const sellerFetchuser = async (req, res, next) => {
         const data = jwt.verify(token, jwtKey);
         if (data) {
             const id = data.user.id;
-
             // Check if the user with the given ID exits in the user model
             const user = await SellerModel.findById(id);
             if (user) {
